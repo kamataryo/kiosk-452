@@ -1,0 +1,35 @@
+FROM debian:bullseye
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 基本パッケージとOpenbox環境
+RUN apt update && apt install -y \
+    openbox \
+    chromium \
+    x11vnc \
+    xvfb \
+    supervisor \
+    dbus-x11 \
+    fonts-dejavu \
+    fonts-noto-cjk \
+    curl \
+    wget \
+    && apt clean
+
+# VNCパスワード設定
+RUN mkdir -p ~/.vnc && x11vnc -storepasswd raspberry ~/.vnc/passwd
+
+# 起動スクリプトをコピー
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+# Supervisor設定をコピー
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# 作業ディレクトリ
+WORKDIR /app
+
+# VNCポート公開
+EXPOSE 5900
+
+CMD ["/usr/bin/supervisord"]
