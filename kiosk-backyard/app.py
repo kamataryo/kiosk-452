@@ -11,7 +11,7 @@ import os
 import json
 from datetime import datetime
 import random
-from zundamon_generator import ZundamonGenerator
+from zundamon_compositor import ZundamonCompositor
 
 # 既存モジュールのパスを追加
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -25,18 +25,18 @@ voice_status = {
     'lastMessage': 'システム起動完了'
 }
 
-# ずんだもん画像生成器を初期化
-zundamon_generator = None
+# ずんだもん画像合成器を初期化
+zundamon_compositor = None
 
 def init_zundamon():
-    """ずんだもん生成器を初期化"""
-    global zundamon_generator
+    """ずんだもん合成器を初期化"""
+    global zundamon_compositor
     try:
-        zundamon_generator = ZundamonGenerator()
-        print("✅ ずんだもん画像生成器を初期化しました")
+        zundamon_compositor = ZundamonCompositor()
+        print("✅ ずんだもん画像合成器を初期化しました")
     except Exception as e:
-        print(f"❌ ずんだもん画像生成器の初期化に失敗: {e}")
-        zundamon_generator = None
+        print(f"❌ ずんだもん画像合成器の初期化に失敗: {e}")
+        zundamon_compositor = None
 
 @app.route('/')
 def index():
@@ -194,14 +194,14 @@ def speak_text():
 def get_zundamon_options():
     """ずんだもんの利用可能なオプションを取得"""
     try:
-        if not zundamon_generator:
+        if not zundamon_compositor:
             return jsonify({
                 'success': False,
-                'error': 'ずんだもん画像生成器が初期化されていません',
+                'error': 'ずんだもん画像合成器が初期化されていません',
                 'timestamp': datetime.now().isoformat()
             }), 503
 
-        options = zundamon_generator.get_available_options()
+        options = zundamon_compositor.get_available_options()
 
         return jsonify({
             'success': True,
@@ -220,10 +220,10 @@ def get_zundamon_options():
 def generate_zundamon():
     """ずんだもん画像を生成"""
     try:
-        if not zundamon_generator:
+        if not zundamon_compositor:
             return jsonify({
                 'success': False,
-                'error': 'ずんだもん画像生成器が初期化されていません',
+                'error': 'ずんだもん画像合成器が初期化されていません',
                 'timestamp': datetime.now().isoformat()
             }), 503
 
@@ -232,8 +232,8 @@ def generate_zundamon():
         params = data.get('params', {})
         format_type = data.get('format', 'PNG')
 
-        # 画像を生成
-        img_buffer = zundamon_generator.generate_image(params, format_type)
+        # 画像を合成
+        img_buffer = zundamon_compositor.compose_image(params, format_type)
 
         # Content-Typeを設定
         mimetype = 'image/png' if format_type.upper() == 'PNG' else 'image/jpeg'
@@ -256,10 +256,10 @@ def generate_zundamon():
 def generate_zundamon_get():
     """ずんだもん画像を生成（GETリクエスト対応）"""
     try:
-        if not zundamon_generator:
+        if not zundamon_compositor:
             return jsonify({
                 'success': False,
-                'error': 'ずんだもん画像生成器が初期化されていません',
+                'error': 'ずんだもん画像合成器が初期化されていません',
                 'timestamp': datetime.now().isoformat()
             }), 503
 
@@ -273,8 +273,8 @@ def generate_zundamon_get():
 
         format_type = request.args.get('format', 'PNG')
 
-        # 画像を生成
-        img_buffer = zundamon_generator.generate_image(params, format_type)
+        # 画像を合成
+        img_buffer = zundamon_compositor.compose_image(params, format_type)
 
         # Content-Typeを設定
         mimetype = 'image/png' if format_type.upper() == 'PNG' else 'image/jpeg'
@@ -351,7 +351,7 @@ if __name__ == '__main__':
     print("URL: http://localhost:8000")
     print("=" * 40)
 
-    # ずんだもん生成器を初期化
+    # ずんだもん合成器を初期化
     init_zundamon()
 
     app.run(

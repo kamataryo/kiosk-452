@@ -1,0 +1,8 @@
+# Zundamon Layer Extraction Factory
+# Development and maintenance tools for PSD processing
+
+psd-tools>=1.9.0      # PSD analysis and layer extraction
+Pillow>=8.0.0         # Image processing and saving
+click>=8.0.0          # CLI interface creation
+tqdm>=4.0.0           # Progress bars
+colorama>=0.4.0       # Colored terminal output

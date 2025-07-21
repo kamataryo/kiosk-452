@@ -10,9 +10,9 @@ psutil==5.9.6
 # Development and utilities
 python-dotenv==1.0.0
 
-# Image processing and PSD handling
-Pillow==10.1.0
-psd-tools==1.9.31
+# Image processing (PSD handling moved to kiosk-factory)
+Pillow==11.3.0
+numpy==1.24.3
 
 # Future integrations (commented out for now)
 # requests==2.31.0  # For external API calls
