@@ -1,0 +1,103 @@
+# Smart Roadster Kiosk 設定ファイル - ダミーファイル
+# このファイルはダミーです。実際の開発時に置き換えてください。
+
+# アプリケーション基本設定
+app:
+  name: "Smart Roadster Kiosk"
+  version: "1.0.0"
+  debug: false
+  log_level: "INFO"
+
+# ディスプレイ設定
+display:
+  resolution:
+    width: 1280
+    height: 800
+  fullscreen: true
+  cursor_visible: false
+  screensaver_timeout: 0  # 無効
+
+# GPS設定
+gps:
+  enabled: true
+  device: "/dev/ttyUSB0"
+  baudrate: 9600
+  update_interval: 1  # 秒
+  location_change_threshold: 0.001  # 度
+
+# 天気予報設定
+weather:
+  enabled: true
+  api_key: "YOUR_OPENWEATHERMAP_API_KEY"  # 実際のAPIキーに置き換え
+  update_interval: 300  # 5分
+  rain_alert_hours: 3
+  location:
+    # デフォルト位置（東京駅）
+    latitude: 35.6812
+    longitude: 139.7671
+
+# 音声設定
+voice:
+  enabled: true
+  voicevox:
+    host: "localhost"
+    port: 50021
+    speaker_id: 3  # ずんだもん
+  volume: 0.8
+  speed_scale: 1.0
+  pitch_scale: 0.0
+  intonation_scale: 1.0
+
+# GPIO設定
+gpio:
+  enabled: true
+  shutdown_pin: 18
+  led_pin: 24
+  button_debounce: 0.1  # 秒
+
+# ネットワーク設定
+network:
+  wifi:
+    enabled: true
+    ssid: "YOUR_WIFI_SSID"
+    password: "YOUR_WIFI_PASSWORD"
+  hotspot:
+    enabled: false
+    ssid: "SmartRoadster-Kiosk"
+    password: "kiosk452"
+
+# ログ設定
+logging:
+  level: "INFO"
+  file: "/var/log/kiosk-452.log"
+  max_size: "10MB"
+  backup_count: 5
+
+# セキュリティ設定
+security:
+  ssh_enabled: true
+  ssh_port: 22
+  firewall_enabled: true
+  auto_update: true
+
+# 車両固有設定
+vehicle:
+  model: "Smart Roadster"
+  year: 2003
+  # 雨に弱い車両のため、天気アラートを重要視
+  rain_sensitivity: "high"
+
+# 地域設定
+locale:
+  language: "ja_JP"
+  timezone: "Asia/Tokyo"
+  currency: "JPY"
+
+# 開発設定
+development:
+  mock_gps: false
+  mock_weather: false
+  mock_gpio: false
+  vnc_enabled: true
+  vnc_port: 5900
+  vnc_password: "raspberry"

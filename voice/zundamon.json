@@ -1,0 +1,25 @@
+{
+  "name": "ずんだもん音声設定",
+  "description": "このファイルはダミーです。実際の開発時に置き換えてください。",
+  "character": "ずんだもん",
+  "voice_id": 3,
+  "scripts": {
+    "welcome": "こんにちはなのだ！Smart Roadsterへようこそなのだ！",
+    "location_change": "新しい場所に到着したのだ！",
+    "rain_alert": "雨が近づいているのだ！気をつけるのだ！",
+    "weather_good": "今日はいい天気なのだ！ドライブ日和なのだ！",
+    "shutdown": "お疲れ様だったのだ！また今度なのだ！"
+  },
+  "animations": {
+    "idle": "zundamon_idle.gif",
+    "speaking": "zundamon_speaking.gif",
+    "happy": "zundamon_happy.gif",
+    "warning": "zundamon_warning.gif"
+  },
+  "settings": {
+    "speed_scale": 1.0,
+    "pitch_scale": 0.0,
+    "intonation_scale": 1.0,
+    "volume_scale": 1.0
+  }
+}

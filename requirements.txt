@@ -1,0 +1,46 @@
+# Smart Roadster Kiosk - Python依存関係 - ダミーファイル
+# このファイルはダミーです。実際の開発時に置き換えてください。
+
+# 実際の開発で使用予定のライブラリ
+
+# GPS関連
+# gpsd-py3==0.3.0          # GPS daemon Python client
+# pynmea2==1.19.0          # NMEA 0183 parser
+# pyserial==3.5            # Serial communication
+
+# 天気予報API
+# requests==2.31.0         # HTTP requests
+# python-dotenv==1.0.0     # Environment variables
+
+# 音声合成 (VOICEVOX)
+# requests==2.31.0         # VOICEVOX API client
+# pygame==2.5.2            # Audio playback
+# pydub==0.25.1            # Audio processing
+
+# GPIO制御 (Raspberry Pi)
+# RPi.GPIO==0.7.1          # GPIO control (Raspberry Pi only)
+# gpiozero==1.6.2          # GPIO library
+
+# Web関連
+# flask==2.3.3             # Web framework (if needed)
+# websockets==11.0.3       # WebSocket support
+
+# データ処理
+# pyyaml==6.0.1            # YAML configuration files
+# python-dateutil==2.8.2  # Date/time utilities
+# pytz==2023.3             # Timezone handling
+
+# ログ・監視
+# psutil==5.9.5            # System monitoring
+# watchdog==3.0.0          # File system monitoring
+
+# 開発・テスト用
+# pytest==7.4.2           # Testing framework
+# black==23.7.0            # Code formatter
+# flake8==6.0.0            # Linting
+
+# 注意事項:
+# - Raspberry Pi 環境では一部のライブラリのインストールに時間がかかる場合があります
+# - RPi.GPIO は Raspberry Pi 環境でのみ動作します
+# - 開発環境では mock ライブラリを使用してテストを行います
+# - 実際の実装時は、使用するライブラリのバージョンを固定してください
