@@ -14,6 +14,7 @@ services:
       - ../sensors:/app/sensors
       - ../voice:/app/voice
       - ../config:/app/config
+      - ../assets:/app/assets
     environment:
       - FLASK_ENV=development
       - FLASK_DEBUG=1

@@ -10,6 +10,10 @@ psutil==5.9.6
 # Development and utilities
 python-dotenv==1.0.0
 
+# Image processing and PSD handling
+Pillow==10.1.0
+psd-tools==1.9.31
+
 # Future integrations (commented out for now)
 # requests==2.31.0  # For external API calls
 # RPi.GPIO==0.7.1   # For Raspberry Pi GPIO (Raspberry Pi only)

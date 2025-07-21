@@ -4,13 +4,14 @@ Smart Roadster Kiosk API Server
 Flask-based JSON API server for the kiosk system
 """
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import sys
 import os
 import json
 from datetime import datetime
 import random
+from zundamon_generator import ZundamonGenerator
 
 # 既存モジュールのパスを追加
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -23,6 +24,19 @@ voice_status = {
     'isPlaying': False,
     'lastMessage': 'システム起動完了'
 }
+
+# ずんだもん画像生成器を初期化
+zundamon_generator = None
+
+def init_zundamon():
+    """ずんだもん生成器を初期化"""
+    global zundamon_generator
+    try:
+        zundamon_generator = ZundamonGenerator()
+        print("✅ ずんだもん画像生成器を初期化しました")
+    except Exception as e:
+        print(f"❌ ずんだもん画像生成器の初期化に失敗: {e}")
+        zundamon_generator = None
 
 @app.route('/')
 def index():
@@ -176,6 +190,109 @@ def speak_text():
             'timestamp': datetime.now().isoformat()
         }), 500
 
+@app.route('/api/zundamon/options')
+def get_zundamon_options():
+    """ずんだもんの利用可能なオプションを取得"""
+    try:
+        if not zundamon_generator:
+            return jsonify({
+                'success': False,
+                'error': 'ずんだもん画像生成器が初期化されていません',
+                'timestamp': datetime.now().isoformat()
+            }), 503
+
+        options = zundamon_generator.get_available_options()
+
+        return jsonify({
+            'success': True,
+            'data': options,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/zundamon/generate', methods=['POST'])
+def generate_zundamon():
+    """ずんだもん画像を生成"""
+    try:
+        if not zundamon_generator:
+            return jsonify({
+                'success': False,
+                'error': 'ずんだもん画像生成器が初期化されていません',
+                'timestamp': datetime.now().isoformat()
+            }), 503
+
+        # パラメータを取得
+        data = request.get_json() if request.is_json else {}
+        params = data.get('params', {})
+        format_type = data.get('format', 'PNG')
+
+        # 画像を生成
+        img_buffer = zundamon_generator.generate_image(params, format_type)
+
+        # Content-Typeを設定
+        mimetype = 'image/png' if format_type.upper() == 'PNG' else 'image/jpeg'
+
+        return send_file(
+            img_buffer,
+            mimetype=mimetype,
+            as_attachment=False,
+            download_name=f'zundamon.{format_type.lower()}'
+        )
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/zundamon/generate')
+def generate_zundamon_get():
+    """ずんだもん画像を生成（GETリクエスト対応）"""
+    try:
+        if not zundamon_generator:
+            return jsonify({
+                'success': False,
+                'error': 'ずんだもん画像生成器が初期化されていません',
+                'timestamp': datetime.now().isoformat()
+            }), 503
+
+        # URLパラメータから設定を取得
+        params = {}
+        for key in ['head_direction', 'right_arm', 'left_arm', 'edamame',
+                   'face_color', 'expression_mouth', 'expression_eyes', 'expression_eyebrows']:
+            value = request.args.get(key)
+            if value:
+                params[key] = value
+
+        format_type = request.args.get('format', 'PNG')
+
+        # 画像を生成
+        img_buffer = zundamon_generator.generate_image(params, format_type)
+
+        # Content-Typeを設定
+        mimetype = 'image/png' if format_type.upper() == 'PNG' else 'image/jpeg'
+
+        return send_file(
+            img_buffer,
+            mimetype=mimetype,
+            as_attachment=False,
+            download_name=f'zundamon.{format_type.lower()}'
+        )
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 @app.route('/api/system/info')
 def get_system_info():
     """システム情報を取得"""
@@ -233,6 +350,9 @@ if __name__ == '__main__':
     print("サーバーを起動中...")
     print("URL: http://localhost:8000")
     print("=" * 40)
+
+    # ずんだもん生成器を初期化
+    init_zundamon()
 
     app.run(
         host='0.0.0.0',
