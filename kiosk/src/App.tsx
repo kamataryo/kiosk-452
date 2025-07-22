@@ -254,12 +254,12 @@ function App() {
                     ブラウザTTSテスト
                   </button>
 
-                  <button
+                  {/* <button
                     onClick={getSpeakers}
                     className="voice-test-btn speakers-btn"
                   >
                     話者一覧取得
-                  </button>
+                  </button> */}
                 </div>
               </div>
             </div>

@@ -147,21 +147,15 @@ export const useWebSocket = () => {
         audio.onerror = (error) => {
           console.error('音声再生エラー:', error);
           setIsProcessing(false);
-          // フォールバックとしてブラウザTTSを使用
-          speakWithBrowserTTS(data.text);
         };
 
         audio.play().catch((error) => {
           console.error('音声再生開始エラー:', error);
           setIsProcessing(false);
-          // フォールバックとしてブラウザTTSを使用
-          speakWithBrowserTTS(data.text);
         });
       } catch (error) {
         console.error('音声データ処理エラー:', error);
         setIsProcessing(false);
-        // フォールバックとしてブラウザTTSを使用
-        speakWithBrowserTTS(data.text);
       }
     });
 
@@ -169,18 +163,12 @@ export const useWebSocket = () => {
     newSocket.on('voice_fallback', (data: VoiceFallbackData) => {
       console.log('VOICEVOXフォールバック:', data.message);
       setIsProcessing(false);
-      // ブラウザTTSを使用
-      speakWithBrowserTTS(data.text);
     });
 
     // 音声合成エラー
     newSocket.on('voice_error', (data: VoiceErrorData) => {
       console.error('音声合成エラー:', data.error);
       setIsProcessing(false);
-      // フォールバックとしてブラウザTTSを使用
-      if (data.text) {
-        speakWithBrowserTTS(data.text);
-      }
     });
 
     // 話者一覧受信
@@ -216,12 +204,8 @@ export const useWebSocket = () => {
       });
     } else {
       console.warn('WebSocket未接続または空のテキスト');
-      // フォールバックとしてブラウザTTSを使用
-      if (text.trim()) {
-        speakWithBrowserTTS(text.trim());
-      }
     }
-  }, [socket, connected, speakWithBrowserTTS]);
+  }, [socket, connected]);
 
   // 話者一覧取得
   const getSpeakers = useCallback(() => {
