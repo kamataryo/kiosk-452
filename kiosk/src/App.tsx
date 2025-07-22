@@ -45,12 +45,17 @@ function App() {
     connected,
     systemStatus,
     isProcessing,
+    isMandanProcessing,
+    currentMandan,
+    ollamaStatus,
     synthesizeVoice,
-    getSpeakers,
+    // getSpeakers,
+    generateMandan,
+    getOllamaStatus,
     speakWithBrowserTTS
   } = useWebSocket();
 
-  console.log(currentTime, gpsData, weatherData, voiceStatus)
+  console.log(zundamonParams, currentTime, gpsData, weatherData, voiceStatus)
   // ずんだもんのランダムパラメータ生成
   const generateRandomZundamonParams = (): ZundamonParams => {
     const options = {
@@ -95,8 +100,8 @@ function App() {
     };
 
     updateZundamon(); // 初回実行
-    const interval = setInterval(updateZundamon, 3000);
-    return () => clearInterval(interval);
+    // const interval = setInterval(updateZundamon, 3000);
+    // return () => clearInterval(interval);
   }, []);
 
   // 現在時刻の更新
@@ -169,6 +174,32 @@ function App() {
     const testMessage = 'ブラウザの音声合成機能でテストしています。';
     speakWithBrowserTTS(testMessage);
   };
+
+  // 漫談生成テスト
+  const handleMandanTest = () => {
+    const topics = [
+      '料理に関する小話',
+      '最近の天気について',
+      'ドライブの楽しさ',
+      '季節の変わり目',
+      '美味しい食べ物の話'
+    ];
+
+    const randomTopic = topics[Math.floor(Math.random() * topics.length)];
+    generateMandan({
+      topic: randomTopic,
+      maxlength: 500,
+      speaker: 3,
+      model: 'mistral'
+    });
+  };
+
+  // Ollama状態取得
+  useEffect(() => {
+    if (connected) {
+      getOllamaStatus();
+    }
+  }, [connected, getOllamaStatus]);
 
   if (loading) {
     return (
@@ -275,8 +306,41 @@ function App() {
             </div>
             */}
 
+            {/* ずんだもん漫談システム */}
+            <div className="status-card mandan-card">
+              <h2>🎭 ずんだもん漫談システム</h2>
+              <div>
+                <p><strong>Ollama接続:</strong> {ollamaStatus?.available ? '✅ 接続中' : '❌ 切断'}</p>
+                {ollamaStatus?.models && ollamaStatus.models.length > 0 && (
+                  <p><strong>利用可能モデル:</strong> {ollamaStatus.models.join(', ')}</p>
+                )}
+                <p><strong>漫談生成状態:</strong> {isMandanProcessing ? '🔄 生成中' : '⏸️ 待機中'}</p>
+
+                {currentMandan && (
+                  <div className="current-mandan">
+                    <p><strong>最新の漫談:</strong></p>
+                    <div className="mandan-content">
+                      <p><strong>トピック:</strong> {currentMandan.topic}</p>
+                      <p><strong>内容:</strong> {currentMandan.sentence}</p>
+                      <p><strong>生成時刻:</strong> {new Date(currentMandan.generatedAt).toLocaleString('ja-JP')}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mandan-controls">
+                  <button
+                    onClick={handleMandanTest}
+                    className="mandan-test-btn"
+                    disabled={isMandanProcessing || !ollamaStatus?.available}
+                  >
+                    {isMandanProcessing ? '漫談生成中...' : 'ずんだもん漫談生成'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* ずんだもんURL表示カード */}
-            <div className="status-card zundamon-url-card">
+            {/* <div className="status-card zundamon-url-card">
               <h2>🎭 ずんだもんURL</h2>
               {zundamonParams && zundamonUrl ? (
                 <div>
@@ -297,12 +361,18 @@ function App() {
               ) : (
                 <p>ずんだもんを生成中...</p>
               )}
-            </div>
+            </div> */}
           </div>
         </div>
 
         <div className="right-panel">
-          {zundamonUrl ? (
+          {currentMandan && currentMandan.zundamonImageUrl ? (
+            <img
+              src={currentMandan.zundamonImageUrl}
+              alt="ずんだもん（漫談中）"
+              className="zundamon-image mandan-active"
+            />
+          ) : zundamonUrl ? (
             <img
               src={zundamonUrl}
               alt="ずんだもん"
@@ -311,6 +381,14 @@ function App() {
           ) : (
             <div className="zundamon-loading">
               <p>ずんだもんを読み込み中...</p>
+            </div>
+          )}
+
+          {currentMandan && (
+            <div className="mandan-overlay">
+              <div className="mandan-bubble">
+                <p>{currentMandan.sentence}</p>
+              </div>
             </div>
           )}
         </div>

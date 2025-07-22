@@ -10,6 +10,7 @@
 
 - 🗺️ **簡易地図表示** - Chromium Kioskモードでの地図表示
 - 🗣️ **ずんだもん音声案内** - VOICEVOX搭載による可愛い音声案内
+- 🎭 **ずんだもん漫談システム** - Ollama + Mistralによる自動漫談生成
 - 📍 **GPS位置追跡** - 現在位置の逆ジオコーディングと市区町村の出入り通知
 - 🌧️ **天気予報・雨アラート** - OpenWeatherMap APIによる雨の接近警告
 - 🔌 **GPIO制御** - エンジンオン/オフに連動した自動起動・シャットダウン
@@ -42,6 +43,24 @@ kiosk-452/
 └── requirements.txt           # Python依存関係
 ```
 
+## 🎭 ずんだもん漫談システム
+
+### 概要
+Ollama + Mistralモデルを使用して、ずんだもんが自動で漫談を生成します。トピックを指定すると、ずんだもんらしい口調で楽しい小話を作成し、適切な表情・ポーズと共に音声で再生します。
+
+### 機能詳細
+- **自動テキスト生成**: Mistralモデルによるずんだもん風漫談の生成
+- **表情・ポーズ制御**: 漫談内容に応じた適切なずんだもん画像の自動選択
+- **音声合成**: VOICEVOX連携による自然な音声再生
+- **YAML構造化出力**: LLMからの確実なパラメータ抽出
+
+### 使用技術
+- **Ollama**: ローカルLLM実行環境
+- **Mistral**: 軽量で高性能な言語モデル
+- **YAML**: 構造化されたレスポンス形式
+- **WebSocket**: リアルタイム通信
+- **並行処理**: 画像生成と音声合成の同時実行
+
 ## 🐳 開発環境セットアップ
 
 ### 前提条件
@@ -57,24 +76,28 @@ kiosk-452/
    cd kiosk-452
    ```
 
-2. **Docker環境の起動**
+2. **Ollamaセットアップ（初回のみ）**
    ```bash
-   cd docker
-   docker-compose up -d
+   ./scripts/setup-ollama.sh
    ```
 
-3. **VNC接続**
-   - VNCクライアントで `localhost:5900` に接続
-   - パスワード: `raspberry`
-   - Chromiumがキオスクモードで https://example.com を表示していることを確認
-
-4. **開発作業**
-   - `kiosk/`, `voice/`, `sensors/` 等のファイルを編集
-   - 変更はリアルタイムでコンテナに反映されます
-
-5. **環境の停止**
+3. **全サービスの起動**
    ```bash
-   docker-compose down
+   docker-compose -f docker/docker-compose.yml up -d
+   ```
+
+4. **アクセス確認**
+   - フロントエンド: http://localhost:3000
+   - バックエンドAPI: http://localhost:8000
+   - Ollama API: http://localhost:11434
+
+5. **漫談機能のテスト**
+   - UIの「ずんだもん漫談生成」ボタンをクリック
+   - 自動でトピックが選択され、漫談が生成されます
+
+6. **環境の停止**
+   ```bash
+   docker-compose -f docker/docker-compose.yml down
    ```
 
 ## 🔧 技術スタック

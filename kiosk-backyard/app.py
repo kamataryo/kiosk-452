@@ -18,6 +18,10 @@ import queue
 import uuid
 import base64
 import io
+import yaml
+import re
+from concurrent.futures import ThreadPoolExecutor
+import ollama
 from zundamon_compositor import ZundamonCompositor
 
 # 既存モジュールのパスを追加
@@ -91,6 +95,116 @@ class VoicevoxClient:
 
 # VOICEVOX クライアントを初期化
 voicevox_client = VoicevoxClient()
+
+class OllamaClient:
+    """Ollama LLMクライアント"""
+
+    def __init__(self, base_url=None):
+        self.base_url = base_url or os.getenv('OLLAMA_URL', 'http://ollama:11434')
+        self.client = ollama.Client(host=self.base_url)
+
+    def is_available(self):
+        """Ollamaが利用可能かチェック"""
+        try:
+            response = requests.get(f"{self.base_url}/api/version", timeout=5)
+            return response.status_code == 200
+        except Exception:
+            return False
+
+    def list_models(self):
+        """利用可能なモデル一覧を取得"""
+        try:
+            return self.client.list()
+        except Exception as e:
+            print(f"モデル一覧取得エラー: {e}")
+            return {'models': []}
+
+    def pull_model(self, model_name):
+        """モデルをダウンロード"""
+        try:
+            return self.client.pull(model_name)
+        except Exception as e:
+            print(f"モデルダウンロードエラー: {e}")
+            raise
+
+    def generate(self, model, prompt, **kwargs):
+        """テキスト生成"""
+        try:
+            response = self.client.generate(
+                model=model,
+                prompt=prompt,
+                **kwargs
+            )
+            return response['response']
+        except Exception as e:
+            print(f"テキスト生成エラー: {e}")
+            raise
+
+# Ollama クライアントを初期化
+ollama_client = OllamaClient()
+
+# 漫談生成用のプロンプトテンプレート
+MANDAN_PROMPT = """あなたはずんだもんです。与えられたトピックについて、ずんだもんらしい短い漫談を作ってください。
+
+トピック: {topic}
+最大文字数: {maxlength}
+
+以下の YAML 形式で厳密に出力してください：
+
+--- ← YAMLドキュメントの開始を示す
+sentence: "ここに漫談の内容"
+zundamonImage:
+  edamame: [萎え, 立ち, 通常, 立ち片折れ] のいずれかを1つ選んで記述
+  expression_eyebrows: [困り眉, 怒り眉2, 怒り眉, 上がり眉, 基本眉, 基本眉2] のいずれかを1つ選んで記述
+  expression_eyes: [><, 〇〇, なごみ目, ^^, にっこり, uu, 閉じ目, ジト目2, 普通目2↑, 普通目2, ジト目ハート, ジト目, 普通目↑, 普通目, 細め目ハート, 細め目, ジト目2←, ジト目2→, 基本目2↑, 基本目2←, 基本目2→, 基本目2, ジト目←, ジト目→, 基本目↑, 基本目←, 基本目→, 基本目] のいずれかを1つ選んで記述
+  expression_mouth: [うへー, むくー, にやり, うわー, んえー, んー, お, δ, ん, あは, ほほえみ, ほあー, ほう, ほあ, えへ, むふ, うへえ] のいずれかを1つ選んで記述
+  face_color: [非表示, 青ざめ, 赤面, ほっぺ赤め, ほっぺ基本] のいずれかを1つ選んで記述
+  left_arm: [腕組み右腕は非表示に, 腰, 横, 手を挙げる, あごに指, 口元, 基本] のいずれかを1つ選んで記述
+  right_arm: [非表示, 腰, 指差し横, 横, 指差し上, 手を挙げる, チョップ, 口元, 基本] のいずれかを1つ選んで記述
+--- ← YAMLドキュメントの終了を示す
+
+注意：
+- 漫談は{maxlength}文字以内
+- ずんだもんの口調（だのだ）を使用
+- zundamonImageのすべての項目は必須
+- 値は必ず指定された候補から1つを厳密に選ぶこと
+- YAML形式を厳密に守ること
+- YAML の前後に開始と終了を示す --- をつけること
+- YAML 以外の内容は絶対に出力しないこと
+- 楽しく親しみやすい内容にする"""
+
+# デフォルトのずんだもんパラメータ
+DEFAULT_ZUNDAMON_PARAMS = {
+    'head_direction': '正面向き',
+    'right_arm': '腰',
+    'left_arm': '腰',
+    'expression_mouth': 'ほう',
+    'expression_eyes': '基本目',
+    'expression_eyebrows': '怒り眉'
+}
+
+def extract_yaml_from_response(response_text: str) -> str:
+    """レスポンスからYAML部分を抽出"""
+    pattern = r'---\s*\n(.*?)\n---'
+    match = re.search(pattern, response_text, re.DOTALL)
+    if match:
+        return match.group(1)
+    else:
+        raise ValueError("YAML形式が見つかりません")
+
+def generate_zundamon_image_url(params: dict) -> str:
+    """ずんだもん画像のURLを生成"""
+    if not zundamon_compositor:
+        return '/api/zundamon/generate'
+
+    try:
+        # 画像を生成してBase64データURLとして返す
+        img_buffer = zundamon_compositor.compose_image(params, 'PNG')
+        img_b64 = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
+        return f"data:image/png;base64,{img_b64}"
+    except Exception as e:
+        print(f"ずんだもん画像生成エラー: {e}")
+        return '/api/zundamon/generate'
 
 def process_voice_queue():
     """音声合成キューを処理"""
@@ -239,6 +353,157 @@ def handle_get_voice_status():
         'voicevox_available': voicevox_client.is_available(),
         'queue_size': voice_queue.qsize()
     })
+
+@socketio.on('generate_mandan')
+def handle_generate_mandan(data):
+    """漫談生成リクエストの処理"""
+    try:
+        topic = data.get('topic', '日常の話')
+        maxlength = data.get('maxlength', 1000)
+        speaker_id = data.get('speaker', 3)  # デフォルトはずんだもん
+        model = data.get('model', 'mistral')
+
+        print(f"漫談生成開始: トピック={topic}, 最大文字数={maxlength}")
+
+        # 処理開始通知
+        emit('mandan_processing', {
+            'topic': topic,
+            'maxlength': maxlength
+        })
+
+        def generate_text():
+            """テキスト生成"""
+            try:
+                if not ollama_client.is_available():
+                    raise Exception("Ollamaサーバーに接続できません")
+
+                prompt = MANDAN_PROMPT.format(topic=topic, maxlength=maxlength)
+                response = ollama_client.generate(model, prompt)
+
+                # デバッグ出力を追加
+                print(f"=== Ollamaレスポンス ===")
+                print(f"レスポンス長: {len(response)}")
+                print(f"レスポンス内容: {response}")
+                print(f"=== レスポンス終了 ===")
+
+                return response
+            except Exception as e:
+                print(f"テキスト生成エラー: {e}")
+                raise
+
+        def generate_image_and_voice(sentence, zundamon_params):
+            """画像と音声を並行生成"""
+            def generate_image():
+                try:
+                    return generate_zundamon_image_url(zundamon_params), zundamon_params
+                except Exception as e:
+                    print(f"画像生成エラー: {e}")
+                    return '/api/zundamon/generate', DEFAULT_ZUNDAMON_PARAMS
+
+            def generate_voice():
+                try:
+                    if voicevox_client.is_available():
+                        return voicevox_client.synthesize(sentence, speaker_id)
+                    return None
+                except Exception as e:
+                    print(f"音声生成エラー: {e}")
+                    return None
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                image_future = executor.submit(generate_image)
+                voice_future = executor.submit(generate_voice)
+
+                image_url, final_params = image_future.result()
+                audio_data = voice_future.result()
+
+                return image_url, final_params, audio_data
+
+        # 1. テキスト生成
+        try:
+            response_text = generate_text()
+            yaml_content = extract_yaml_from_response(response_text)
+            parsed_data = yaml.safe_load(yaml_content)
+
+            sentence = parsed_data.get('sentence', '')
+            zundamon_params = parsed_data.get('zundamonImage', DEFAULT_ZUNDAMON_PARAMS)
+
+            if not sentence:
+                raise ValueError("漫談テキストが生成されませんでした")
+
+        except Exception as e:
+            print(f"YAML解析エラー: {e}")
+            print(f"生のレスポンス（最初の500文字）: {response_text[:500]}...")
+            print(f"生のレスポンス（最後の500文字）: ...{response_text[-500:]}")
+
+            # YAML抽出の詳細デバッグ
+            try:
+                yaml_content = extract_yaml_from_response(response_text)
+                print(f"抽出されたYAML: {yaml_content}")
+            except Exception as yaml_error:
+                print(f"YAML抽出失敗: {yaml_error}")
+
+            # フォールバック: シンプルな漫談を生成
+            sentence = f"{topic}について話すのだ！面白い話があるのだ〜"
+            zundamon_params = DEFAULT_ZUNDAMON_PARAMS
+
+        # 2. 画像と音声を並行生成
+        try:
+            image_url, final_params, audio_data = generate_image_and_voice(sentence, zundamon_params)
+        except Exception as e:
+            print(f"画像・音声生成エラー: {e}")
+            image_url = '/api/zundamon/generate'
+            final_params = DEFAULT_ZUNDAMON_PARAMS
+            audio_data = None
+
+        # 3. レスポンス構築
+        response_data = {
+            'sentence': sentence,
+            'zundamonImageUrl': image_url,
+            'zundamonParams': final_params,
+            'topic': topic,
+            'generatedAt': datetime.now().isoformat()
+        }
+
+        # 音声データがある場合は追加
+        if audio_data:
+            audio_b64 = base64.b64encode(audio_data).decode('utf-8')
+            response_data['audio'] = {
+                'audioData': audio_b64,
+                'format': 'wav',
+                'speaker': speaker_id
+            }
+
+        # 完了通知
+        emit('mandan_ready', response_data)
+        print(f"漫談生成完了: {sentence[:50]}...")
+
+    except Exception as e:
+        print(f"漫談生成エラー: {e}")
+        emit('mandan_error', {
+            'error': str(e),
+            'topic': data.get('topic', ''),
+            'timestamp': datetime.now().isoformat()
+        })
+
+@socketio.on('get_ollama_status')
+def handle_get_ollama_status():
+    """Ollamaシステム状態取得"""
+    try:
+        available = ollama_client.is_available()
+        models = ollama_client.list_models() if available else {'models': []}
+
+        emit('ollama_status', {
+            'available': available,
+            'models': [model['name'] for model in models.get('models', [])],
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        emit('ollama_status', {
+            'available': False,
+            'models': [],
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        })
 
 def init_zundamon():
     """ずんだもん合成器を初期化"""
@@ -572,6 +837,21 @@ if __name__ == '__main__':
         print("✅ VOICEVOX ENGINE接続確認済み")
     else:
         print("⚠️  VOICEVOX ENGINEに接続できません（フォールバック機能で動作）")
+
+    # Ollama接続確認
+    if ollama_client.is_available():
+        print("✅ Ollama接続確認済み")
+        try:
+            models = ollama_client.list_models()
+            model_names = [model['name'] for model in models.get('models', [])]
+            if model_names:
+                print(f"   利用可能なモデル: {', '.join(model_names)}")
+            else:
+                print("   モデルが見つかりません。mistralモデルをダウンロードしてください。")
+        except Exception as e:
+            print(f"   モデル一覧取得エラー: {e}")
+    else:
+        print("⚠️  Ollamaに接続できません（漫談機能は利用できません）")
 
     # SocketIOサーバーを起動
     socketio.run(

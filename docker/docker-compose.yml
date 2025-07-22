@@ -35,6 +35,7 @@ services:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
       - VOICEVOX_URL=http://voicevox-engine:50021
+      - OLLAMA_URL=http://ollama:11434
     restart: unless-stopped
     networks:
       - kiosk-network
@@ -69,6 +70,26 @@ services:
       timeout: 10s
       retries: 3
 
+  # Ollama for LLM text generation
+  ollama:
+    image: ollama/ollama:latest
+    container_name: kiosk-452-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=5m
+    networks:
+      - kiosk-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
   # Chromium Kiosk Display
   kiosk-display:
     build:
@@ -89,6 +110,9 @@ services:
     restart: unless-stopped
     networks:
       - kiosk-network
+
+volumes:
+  ollama_data:
 
 networks:
   kiosk-network:

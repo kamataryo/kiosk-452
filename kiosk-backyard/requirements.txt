@@ -18,5 +18,11 @@ numpy==1.24.3
 # HTTP requests for VOICEVOX API
 requests==2.31.0
 
+# Ollama client for LLM integration
+ollama==0.1.7
+
+# YAML processing for structured output
+PyYAML==6.0.1
+
 # Future integrations (commented out for now)
 # RPi.GPIO==0.7.1   # For Raspberry Pi GPIO (Raspberry Pi only)

@@ -204,6 +204,131 @@ body {
   border-left: 4px solid #E91E63;
 }
 
+.mandan-card {
+  border-left: 4px solid #FF6B35;
+}
+
+.current-mandan {
+  background: rgba(255, 107, 53, 0.1);
+  border: 1px solid rgba(255, 107, 53, 0.3);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.mandan-content {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0.8rem;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+}
+
+.mandan-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.mandan-test-btn {
+  background: linear-gradient(45deg, #FF6B35, #F7931E);
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+}
+
+.mandan-test-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+}
+
+.mandan-test-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.mandan-test-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.zundamon-image.mandan-active {
+  border: 3px solid #FF6B35;
+  box-shadow: 0 4px 20px rgba(255, 107, 53, 0.4);
+  animation: mandanGlow 2s infinite alternate;
+}
+
+@keyframes mandanGlow {
+  0% { box-shadow: 0 4px 20px rgba(255, 107, 53, 0.4); }
+  100% { box-shadow: 0 8px 30px rgba(255, 107, 53, 0.6); }
+}
+
+.mandan-overlay {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.mandan-bubble {
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
+  padding: 1rem 1.5rem;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  position: relative;
+  animation: bubbleFloat 3s ease-in-out infinite;
+  border: 2px solid #FF6B35;
+}
+
+.mandan-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 30px;
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-top: 15px solid #FF6B35;
+}
+
+.mandan-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 32px;
+  width: 0;
+  height: 0;
+  border-left: 13px solid transparent;
+  border-right: 13px solid transparent;
+  border-top: 13px solid rgba(255, 255, 255, 0.95);
+}
+
+@keyframes bubbleFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+.mandan-bubble p {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.right-panel {
+  position: relative;
+}
+
 .url-display {
   background: rgba(0, 0, 0, 0.2);
   padding: 0.5rem;

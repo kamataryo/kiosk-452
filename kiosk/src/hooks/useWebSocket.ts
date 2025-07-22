@@ -65,12 +65,62 @@ interface VoiceStatusUpdateData {
   queue_size: number;
 }
 
+interface ZundamonParams {
+  head_direction: string;
+  right_arm: string;
+  left_arm: string;
+  expression_mouth: string;
+  expression_eyes: string;
+  expression_eyebrows: string;
+}
+
+interface MandanRequest {
+  topic: string;
+  maxlength: number;
+  speaker?: number;
+  model?: string;
+}
+
+interface MandanResponse {
+  sentence: string;
+  zundamonImageUrl: string;
+  zundamonParams: ZundamonParams;
+  audio?: {
+    audioData: string;
+    format: string;
+    speaker: number;
+  };
+  topic: string;
+  generatedAt: string;
+}
+
+interface MandanProcessingData {
+  topic: string;
+  maxlength: number;
+}
+
+interface MandanErrorData {
+  error: string;
+  topic: string;
+  timestamp: string;
+}
+
+interface OllamaStatusData {
+  available: boolean;
+  models: string[];
+  error?: string;
+  timestamp: string;
+}
+
 export const useWebSocket = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isMandanProcessing, setIsMandanProcessing] = useState(false);
+  const [currentMandan, setCurrentMandan] = useState<MandanResponse | null>(null);
+  const [ollamaStatus, setOllamaStatus] = useState<OllamaStatusData | null>(null);
 
   // Base64をBlobに変換するヘルパー関数
   const base64ToBlob = useCallback((base64: string, mimeType: string): Blob => {
@@ -186,6 +236,53 @@ export const useWebSocket = () => {
       setSystemStatus(prev => prev ? { ...prev, ...data } : null);
     });
 
+    // 漫談生成処理中通知
+    newSocket.on('mandan_processing', (data: MandanProcessingData) => {
+      console.log('漫談生成処理中:', data);
+      setIsMandanProcessing(true);
+    });
+
+    // 漫談生成完了
+    newSocket.on('mandan_ready', (data: MandanResponse) => {
+      console.log('漫談生成完了:', data);
+      setCurrentMandan(data);
+      setIsMandanProcessing(false);
+
+      // 音声がある場合は自動再生
+      if (data.audio) {
+        try {
+          const audioBlob = base64ToBlob(data.audio.audioData, 'audio/wav');
+          const audio = new Audio(URL.createObjectURL(audioBlob));
+
+          audio.onended = () => {
+            URL.revokeObjectURL(audio.src); // メモリリークを防ぐ
+          };
+
+          audio.onerror = (error) => {
+            console.error('漫談音声再生エラー:', error);
+          };
+
+          audio.play().catch((error) => {
+            console.error('漫談音声再生開始エラー:', error);
+          });
+        } catch (error) {
+          console.error('漫談音声データ処理エラー:', error);
+        }
+      }
+    });
+
+    // 漫談生成エラー
+    newSocket.on('mandan_error', (data: MandanErrorData) => {
+      console.error('漫談生成エラー:', data.error);
+      setIsMandanProcessing(false);
+    });
+
+    // Ollama状態更新
+    newSocket.on('ollama_status', (data: OllamaStatusData) => {
+      setOllamaStatus(data);
+      console.log('Ollama状態受信:', data);
+    });
+
     setSocket(newSocket);
 
     // クリーンアップ
@@ -221,15 +318,36 @@ export const useWebSocket = () => {
     }
   }, [socket, connected]);
 
+  // 漫談生成リクエスト
+  const generateMandan = useCallback((request: MandanRequest) => {
+    if (socket && connected) {
+      socket.emit('generate_mandan', request);
+    } else {
+      console.warn('WebSocket未接続');
+    }
+  }, [socket, connected]);
+
+  // Ollama状態取得
+  const getOllamaStatus = useCallback(() => {
+    if (socket && connected) {
+      socket.emit('get_ollama_status');
+    }
+  }, [socket, connected]);
+
   return {
     socket,
     connected,
     systemStatus,
     speakers,
     isProcessing,
+    isMandanProcessing,
+    currentMandan,
+    ollamaStatus,
     synthesizeVoice,
     getSpeakers,
     getVoiceStatus,
+    generateMandan,
+    getOllamaStatus,
     speakWithBrowserTTS
   };
 };
