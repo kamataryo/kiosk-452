@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './App.css';
+import { useWebSocket } from './hooks/useWebSocket';
 
 interface GPSData {
   latitude: number;
@@ -38,6 +39,17 @@ function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [zundamonParams, setZundamonParams] = useState<ZundamonParams | null>(null);
   const [zundamonUrl, setZundamonUrl] = useState<string>('');
+
+  // WebSocket接続とVOICEVOX音声システム
+  const {
+    connected,
+    systemStatus,
+    isProcessing,
+    synthesizeVoice,
+    getSpeakers,
+    speakWithBrowserTTS
+  } = useWebSocket();
+
   console.log(currentTime, gpsData, weatherData, voiceStatus)
   // ずんだもんのランダムパラメータ生成
   const generateRandomZundamonParams = (): ZundamonParams => {
@@ -139,26 +151,24 @@ function App() {
     // return () => clearInterval(interval);
   }, []);
 
-  // const handleVoiceTest = async () => {
-  //   try {
-  //     const response = await fetch('/api/voice/speak', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({
-  //         text: 'こんにちは！Smart Roadsterのキオスクシステムです。'
-  //       }),
-  //     });
+  // VOICEVOX音声テスト
+  const handleVoiceTest = () => {
+    const testMessages = [
+      'こんにちは！Smart Roadsterのキオスクシステムなのだ！',
+      'ずんだもんが音声でお知らせするのだ！',
+      'VOICEVOX音声合成システムが動作中なのだ！',
+      'WebSocketで音声データを送信しているのだ！'
+    ];
 
-  //     if (response.ok) {
-  //       const result = await response.json();
-  //       console.log('音声再生:', result);
-  //     }
-  //   } catch (error) {
-  //     console.error('音声再生エラー:', error);
-  //   }
-  // };
+    const randomMessage = testMessages[Math.floor(Math.random() * testMessages.length)];
+    synthesizeVoice(randomMessage, 3); // 3 = ずんだもん
+  };
+
+  // ブラウザTTSテスト
+  const handleBrowserTTSTest = () => {
+    const testMessage = 'ブラウザの音声合成機能でテストしています。';
+    speakWithBrowserTTS(testMessage);
+  };
 
   if (loading) {
     return (
@@ -217,22 +227,42 @@ function App() {
             */}
 
             {/* 音声システム */}
-            {/*
             <div className="status-card voice-card">
               <h2>🗣️ ずんだもん音声システム</h2>
-              {voiceStatus ? (
-                <div>
-                  <p><strong>ステータス:</strong> {voiceStatus.isPlaying ? '再生中' : '待機中'}</p>
-                  <p><strong>最後のメッセージ:</strong> {voiceStatus.lastMessage}</p>
-                  <button onClick={handleVoiceTest} className="voice-test-btn">
-                    音声テスト
+              <div>
+                <p><strong>WebSocket接続:</strong> {connected ? '✅ 接続中' : '❌ 切断'}</p>
+                <p><strong>VOICEVOX:</strong> {systemStatus?.voicevox_available ? '✅ 利用可能' : '❌ 利用不可'}</p>
+                <p><strong>処理状態:</strong> {isProcessing ? '🔄 処理中' : '⏸️ 待機中'}</p>
+                {systemStatus?.voice_status?.lastMessage && (
+                  <p><strong>最後のメッセージ:</strong> {systemStatus.voice_status.lastMessage}</p>
+                )}
+
+                <div className="voice-controls">
+                  <button
+                    onClick={handleVoiceTest}
+                    className="voice-test-btn"
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? '音声合成中...' : 'VOICEVOX音声テスト'}
+                  </button>
+
+                  <button
+                    onClick={handleBrowserTTSTest}
+                    className="voice-test-btn browser-tts"
+                    disabled={isProcessing}
+                  >
+                    ブラウザTTSテスト
+                  </button>
+
+                  <button
+                    onClick={getSpeakers}
+                    className="voice-test-btn speakers-btn"
+                  >
+                    話者一覧取得
                   </button>
                 </div>
-              ) : (
-                <p className="error">音声システムに接続できませんでした</p>
-              )}
+              </div>
             </div>
-            */}
 
             {/* システム情報 */}
             {/*

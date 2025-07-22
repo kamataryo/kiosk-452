@@ -1,6 +1,22 @@
 version: '3.8'
 
 services:
+  # VOICEVOX Engine for voice synthesis
+  voicevox-engine:
+    image: voicevox/voicevox_engine:cpu-ubuntu20.04-latest
+    container_name: kiosk-452-voicevox
+    ports:
+      - "50021:50021"
+    networks:
+      - kiosk-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:50021/version"]  # より軽量なエンドポイント
+      interval: 30s
+      timeout: 10s
+      retries: 10  # リトライ回数を増加（5→10）
+      start_period: 60s  # 初回ヘルスチェックまでの猶予時間を追加
+    restart: unless-stopped
+
   # Flask API Backend
   kiosk-backend:
     build:
@@ -18,9 +34,13 @@ services:
     environment:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
+      - VOICEVOX_URL=http://voicevox-engine:50021
     restart: unless-stopped
     networks:
       - kiosk-network
+    # depends_on:
+    #   voicevox-engine:
+    #     condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s

@@ -3,6 +3,7 @@
 # Flask web framework
 Flask==3.0.0
 Flask-CORS==4.0.0
+Flask-SocketIO==5.3.6
 
 # System monitoring
 psutil==5.9.6
@@ -14,6 +15,8 @@ python-dotenv==1.0.0
 Pillow==11.3.0
 numpy==1.24.3
 
+# HTTP requests for VOICEVOX API
+requests==2.31.0
+
 # Future integrations (commented out for now)
-# requests==2.31.0  # For external API calls
 # RPi.GPIO==0.7.1   # For Raspberry Pi GPIO (Raspberry Pi only)

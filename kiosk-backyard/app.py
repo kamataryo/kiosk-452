@@ -6,11 +6,18 @@ Flask-based JSON API server for the kiosk system
 
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import sys
 import os
 import json
 from datetime import datetime
 import random
+import requests
+import threading
+import queue
+import uuid
+import base64
+import io
 from zundamon_compositor import ZundamonCompositor
 
 # 既存モジュールのパスを追加
@@ -18,6 +25,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 app = Flask(__name__)
 CORS(app)  # フロントエンドからのアクセスを許可
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # グローバル変数（簡易的な状態管理）
 voice_status = {
@@ -25,8 +33,212 @@ voice_status = {
     'lastMessage': 'システム起動完了'
 }
 
+# 音声合成キュー
+voice_queue = queue.Queue()
+
 # ずんだもん画像合成器を初期化
 zundamon_compositor = None
+
+class VoicevoxClient:
+    """VOICEVOX ENGINEクライアント"""
+
+    def __init__(self, base_url=None):
+        self.base_url = base_url or os.getenv('VOICEVOX_URL', 'http://voicevox-engine:50021')
+
+    def is_available(self):
+        """VOICEVOX ENGINEが利用可能かチェック"""
+        try:
+            response = requests.get(f"{self.base_url}/version", timeout=5)
+            return response.status_code == 200
+        except Exception:
+            return False
+
+    def get_speakers(self):
+        """利用可能な話者一覧を取得"""
+        try:
+            response = requests.get(f"{self.base_url}/speakers", timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"話者一覧取得エラー: {e}")
+            return []
+
+    def synthesize(self, text, speaker_id=3):
+        """音声合成を実行"""
+        try:
+            # 1. 音声クエリを生成
+            query_response = requests.post(
+                f"{self.base_url}/audio_query",
+                params={"text": text, "speaker": speaker_id},
+                timeout=10
+            )
+            query_response.raise_for_status()
+
+            # 2. 音声合成を実行
+            synthesis_response = requests.post(
+                f"{self.base_url}/synthesis",
+                params={"speaker": speaker_id},
+                json=query_response.json(),
+                timeout=30
+            )
+            synthesis_response.raise_for_status()
+
+            return synthesis_response.content
+
+        except Exception as e:
+            print(f"音声合成エラー: {e}")
+            raise
+
+# VOICEVOX クライアントを初期化
+voicevox_client = VoicevoxClient()
+
+def process_voice_queue():
+    """音声合成キューを処理"""
+    while not voice_queue.empty():
+        task = voice_queue.get()
+
+        # 処理開始通知
+        socketio.emit('voice_processing', {
+            'task_id': task['task_id'],
+            'text': task['text']
+        }, room=task['client_id'])
+
+        try:
+            # VOICEVOX で音声合成
+            if voicevox_client.is_available():
+                audio_data = voicevox_client.synthesize(
+                    task['text'],
+                    task['speaker_id']
+                )
+
+                # 音声データをBase64エンコードして送信
+                audio_b64 = base64.b64encode(audio_data).decode('utf-8')
+
+                socketio.emit('voice_ready', {
+                    'task_id': task['task_id'],
+                    'audio_data': audio_b64,
+                    'format': 'wav',
+                    'text': task['text']
+                }, room=task['client_id'])
+
+                # ステータス更新
+                global voice_status
+                voice_status['lastMessage'] = task['text']
+                voice_status['isPlaying'] = False
+
+            else:
+                # VOICEVOX が利用できない場合のフォールバック
+                socketio.emit('voice_fallback', {
+                    'task_id': task['task_id'],
+                    'text': task['text'],
+                    'message': 'VOICEVOX ENGINEが利用できません。ブラウザTTSを使用してください。'
+                }, room=task['client_id'])
+
+        except Exception as e:
+            print(f"音声合成エラー: {e}")
+            socketio.emit('voice_error', {
+                'task_id': task['task_id'],
+                'error': str(e),
+                'text': task['text']
+            }, room=task['client_id'])
+
+# WebSocket イベントハンドラー
+@socketio.on('connect')
+def handle_connect():
+    """クライアント接続時の処理"""
+    print(f'WebSocketクライアント接続: {request.sid}')
+
+    # 接続状態とシステム状態を送信
+    emit('status', {
+        'connected': True,
+        'voice_status': voice_status,
+        'voicevox_available': voicevox_client.is_available(),
+        'queue_size': voice_queue.qsize()
+    })
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """クライアント切断時の処理"""
+    print(f'WebSocketクライアント切断: {request.sid}')
+
+@socketio.on('voice_synthesize')
+def handle_voice_synthesize(data):
+    """音声合成リクエストの処理"""
+    try:
+        text = data.get('text', '')
+        speaker_id = data.get('speaker', 3)  # デフォルトはずんだもん
+        priority = data.get('priority', 'normal')
+
+        if not text:
+            emit('voice_error', {
+                'error': 'テキストが指定されていません'
+            })
+            return
+
+        # タスクIDを生成
+        task_id = str(uuid.uuid4())
+
+        # キューに追加
+        voice_queue.put({
+            'task_id': task_id,
+            'text': text,
+            'speaker_id': speaker_id,
+            'priority': priority,
+            'client_id': request.sid,
+            'timestamp': datetime.now().isoformat()
+        })
+
+        # キュー追加通知
+        emit('voice_queued', {
+            'task_id': task_id,
+            'queue_position': voice_queue.qsize(),
+            'text': text
+        })
+
+        # ステータス更新
+        global voice_status
+        voice_status['isPlaying'] = True
+
+        # 音声合成処理を開始（別スレッド）
+        threading.Thread(target=process_voice_queue, daemon=True).start()
+
+    except Exception as e:
+        print(f"音声合成リクエストエラー: {e}")
+        emit('voice_error', {
+            'error': str(e)
+        })
+
+@socketio.on('get_speakers')
+def handle_get_speakers():
+    """話者一覧取得"""
+    try:
+        if voicevox_client.is_available():
+            speakers = voicevox_client.get_speakers()
+            emit('speakers_list', {
+                'speakers': speakers,
+                'available': True
+            })
+        else:
+            emit('speakers_list', {
+                'speakers': [],
+                'available': False,
+                'message': 'VOICEVOX ENGINEが利用できません'
+            })
+    except Exception as e:
+        emit('speakers_list', {
+            'speakers': [],
+            'available': False,
+            'error': str(e)
+        })
+
+@socketio.on('get_voice_status')
+def handle_get_voice_status():
+    """音声システム状態取得"""
+    emit('voice_status_update', {
+        'voice_status': voice_status,
+        'voicevox_available': voicevox_client.is_available(),
+        'queue_size': voice_queue.qsize()
+    })
 
 def init_zundamon():
     """ずんだもん合成器を初期化"""
@@ -349,14 +561,23 @@ if __name__ == '__main__':
     print("=" * 40)
     print("サーバーを起動中...")
     print("URL: http://localhost:8000")
+    print("WebSocket: ws://localhost:8000")
     print("=" * 40)
 
     # ずんだもん合成器を初期化
     init_zundamon()
 
-    app.run(
+    # VOICEVOX接続確認
+    if voicevox_client.is_available():
+        print("✅ VOICEVOX ENGINE接続確認済み")
+    else:
+        print("⚠️  VOICEVOX ENGINEに接続できません（フォールバック機能で動作）")
+
+    # SocketIOサーバーを起動
+    socketio.run(
+        app,
         host='0.0.0.0',
         port=8000,
         debug=True,
-        threaded=True
+        allow_unsafe_werkzeug=True
     )
