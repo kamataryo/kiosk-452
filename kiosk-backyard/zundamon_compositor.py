@@ -131,6 +131,9 @@ class ZundamonCompositor:
 
                 api_options[api_param] = clean_options
 
+            # something_like_shippo パラメータを追加
+            api_options["something_like_shippo"] = ["true", "false"]
+
             return api_options
 
         except Exception as e:
@@ -163,7 +166,11 @@ class ZundamonCompositor:
             }
 
             for param_name, value in params.items():
-                if param_name in param_to_group:
+                if param_name == "something_like_shippo":
+                    # 尻尾のような何かレイヤーの処理
+                    if value.lower() == "true":
+                        layer_names.append("尻尾のような何か")
+                elif param_name in param_to_group:
                     # 対応するグループを検索
                     for group_name in param_to_group[param_name]:
                         if group_name in radio_groups:
@@ -219,7 +226,8 @@ class ZundamonCompositor:
                 "face_color": "ほっぺ基本",
                 "expression_mouth": "ほう",
                 "expression_eyes": "基本目",
-                "expression_eyebrows": "怒り眉"
+                "expression_eyebrows": "怒り眉",
+                "something_like_shippo": "true"
             }
 
             # デフォルト値で不足分を補完
