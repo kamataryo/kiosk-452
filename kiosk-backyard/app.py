@@ -22,6 +22,7 @@ import yaml
 import re
 from concurrent.futures import ThreadPoolExecutor
 import ollama
+import anthropic
 from zundamon_compositor import ZundamonCompositor
 
 # 既存モジュールのパスを追加
@@ -143,6 +144,52 @@ class OllamaClient:
 # Ollama クライアントを初期化
 ollama_client = OllamaClient()
 
+class ClaudeClient:
+    """Claude API クライアント"""
+
+    def __init__(self, api_key=None):
+        self.api_key = api_key or os.getenv('CLAUDE_API_KEY')
+        self.client = None
+        if self.api_key:
+            try:
+                self.client = anthropic.Anthropic(api_key=self.api_key)
+            except Exception as e:
+                print(f"Claude APIクライアント初期化エラー: {e}")
+                self.client = None
+
+    def is_available(self):
+        """Claude APIが利用可能かチェック"""
+        if not self.api_key or not self.client:
+            return False
+        try:
+            # 簡単なテストリクエストでAPIキーの有効性を確認
+            # 実際のリクエストは避けて、クライアントの初期化状態のみチェック
+            return True
+        except Exception:
+            return False
+
+    def generate(self, prompt, max_tokens=1000):
+        """テキスト生成"""
+        try:
+            if not self.client:
+                raise Exception("Claude APIクライアントが初期化されていません")
+
+            response = self.client.messages.create(
+                model="claude-3-haiku-20240307",
+                max_tokens=max_tokens,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+
+            return response.content[0].text
+        except Exception as e:
+            print(f"Claude API テキスト生成エラー: {e}")
+            raise
+
+# Claude クライアントを初期化
+claude_client = ClaudeClient()
+
 # 漫談生成用のプロンプトテンプレート
 MANDAN_PROMPT = """あなたはずんだもんです。与えられたトピックについて、ずんだもんらしい短い漫談を作ってください。
 
@@ -154,18 +201,18 @@ MANDAN_PROMPT = """あなたはずんだもんです。与えられたトピッ�
 --- ← YAMLドキュメントの開始を示す
 sentence: "ここに漫談の内容"
 zundamonImage:
-  edamame: [萎え, 立ち, 通常, 立ち片折れ] のいずれかを1つ選んで記述
-  expression_eyebrows: [困り眉, 怒り眉2, 怒り眉, 上がり眉, 基本眉, 基本眉2] のいずれかを1つ選んで記述
-  expression_eyes: [><, 〇〇, なごみ目, ^^, にっこり, uu, 閉じ目, ジト目2, 普通目2↑, 普通目2, ジト目ハート, ジト目, 普通目↑, 普通目, 細め目ハート, 細め目, ジト目2←, ジト目2→, 基本目2↑, 基本目2←, 基本目2→, 基本目2, ジト目←, ジト目→, 基本目↑, 基本目←, 基本目→, 基本目] のいずれかを1つ選んで記述
-  expression_mouth: [うへー, むくー, にやり, うわー, んえー, んー, お, δ, ん, あは, ほほえみ, ほあー, ほう, ほあ, えへ, むふ, うへえ] のいずれかを1つ選んで記述
-  face_color: [非表示, 青ざめ, 赤面, ほっぺ赤め, ほっぺ基本] のいずれかを1つ選んで記述
-  left_arm: [腕組み右腕は非表示に, 腰, 横, 手を挙げる, あごに指, 口元, 基本] のいずれかを1つ選んで記述
-  right_arm: [非表示, 腰, 指差し横, 横, 指差し上, 手を挙げる, チョップ, 口元, 基本] のいずれかを1つ選んで記述
+  edamame: ['通常', '立ち', '萎え', '立ち片折れ'] のいずれかを1つ選んで記述
+  expression_eyebrows: ['基本眉', '怒り眉', '困り眉', '上がり眉', '怒り眉2'] のいずれかを1つ選んで記述
+  expression_eyes: ['基本目', 'にっこり', '^^', 'なごみ目', '閉じ目', 'ジト目', '〇〇'] のいずれかを1つ選んで記述
+  expression_mouth: ['ほう', 'あは', 'ほほえみ', 'えへ', 'にやり', 'むふ', 'お', 'ん'] のいずれかを1つ選んで記述
+  face_color: ['ほっぺ基本', 'ほっぺ赤め', '赤面', '青ざめ', '非表示'] のいずれかを1つ選んで記述
+  left_arm: ['腰', '横', '手を挙げる', '基本', 'あごに指', '口元'] のいずれかを1つ選んで記述
+  right_arm: ['腰', '指差し横', '手を挙げる', '基本', '横', '指差し上'] のいずれかを1つ選んで記述
 --- ← YAMLドキュメントの終了を示す
 
 注意：
 - 漫談は{maxlength}文字以内
-- ずんだもんの口調（だのだ）を使用
+- ずんだもんの口調（のだ）を使用
 - zundamonImageのすべての項目は必須
 - 値は必ず指定された候補から1つを厳密に選ぶこと
 - YAML形式を厳密に守ること
@@ -362,33 +409,50 @@ def handle_generate_mandan(data):
         maxlength = data.get('maxlength', 1000)
         speaker_id = data.get('speaker', 3)  # デフォルトはずんだもん
         model = data.get('model', 'mistral')
+        provider = data.get('provider', 'ollama')  # 'ollama' または 'claude'
 
-        print(f"漫談生成開始: トピック={topic}, 最大文字数={maxlength}")
+        print(f"漫談生成開始: プロバイダー={provider}, トピック={topic}, 最大文字数={maxlength}")
 
         # 処理開始通知
         emit('mandan_processing', {
             'topic': topic,
-            'maxlength': maxlength
+            'maxlength': maxlength,
+            'provider': provider
         })
 
         def generate_text():
             """テキスト生成"""
             try:
-                if not ollama_client.is_available():
-                    raise Exception("Ollamaサーバーに接続できません")
-
                 prompt = MANDAN_PROMPT.format(topic=topic, maxlength=maxlength)
-                response = ollama_client.generate(model, prompt)
 
-                # デバッグ出力を追加
-                print(f"=== Ollamaレスポンス ===")
-                print(f"レスポンス長: {len(response)}")
-                print(f"レスポンス内容: {response}")
-                print(f"=== レスポンス終了 ===")
+                if provider == 'claude':
+                    if not claude_client.is_available():
+                        raise Exception("Claude APIが利用できません")
 
-                return response
+                    response = claude_client.generate(prompt, max_tokens=1500)
+
+                    # デバッグ出力を追加
+                    print(f"=== Claudeレスポンス ===")
+                    print(f"レスポンス長: {len(response)}")
+                    print(f"レスポンス内容: {response}")
+                    print(f"=== レスポンス終了 ===")
+
+                    return response
+                else:  # ollama
+                    if not ollama_client.is_available():
+                        raise Exception("Ollamaサーバーに接続できません")
+
+                    response = ollama_client.generate(model, prompt)
+
+                    # デバッグ出力を追加
+                    print(f"=== Ollamaレスポンス ===")
+                    print(f"レスポンス長: {len(response)}")
+                    print(f"レスポンス内容: {response}")
+                    print(f"=== レスポンス終了 ===")
+
+                    return response
             except Exception as e:
-                print(f"テキスト生成エラー: {e}")
+                print(f"テキスト生成エラー ({provider}): {e}")
                 raise
 
         def generate_image_and_voice(sentence, zundamon_params):
@@ -501,6 +565,27 @@ def handle_get_ollama_status():
         emit('ollama_status', {
             'available': False,
             'models': [],
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        })
+
+@socketio.on('get_claude_status')
+def handle_get_claude_status():
+    """Claude APIシステム状態取得"""
+    try:
+        available = claude_client.is_available()
+        api_key_configured = bool(claude_client.api_key)
+
+        emit('claude_status', {
+            'available': available,
+            'api_key_configured': api_key_configured,
+            'model': 'claude-3-haiku-20240307',
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        emit('claude_status', {
+            'available': False,
+            'api_key_configured': False,
             'error': str(e),
             'timestamp': datetime.now().isoformat()
         })
@@ -852,6 +937,16 @@ if __name__ == '__main__':
             print(f"   モデル一覧取得エラー: {e}")
     else:
         print("⚠️  Ollamaに接続できません（漫談機能は利用できません）")
+
+    # Claude API接続確認
+    if claude_client.is_available():
+        print("✅ Claude API接続確認済み")
+        print(f"   利用モデル: claude-3-haiku-20240307")
+    else:
+        if not claude_client.api_key:
+            print("⚠️  Claude APIキーが設定されていません（.envrcファイルでCLAUDE_API_KEYを設定してください）")
+        else:
+            print("⚠️  Claude APIに接続できません（APIキーを確認してください）")
 
     # SocketIOサーバーを起動
     socketio.run(

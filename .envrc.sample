@@ -1,0 +1,10 @@
+# Claude API Configuration
+export CLAUDE_API_KEY="your-claude-api-key-here"
+
+# Usage:
+# 1. Copy this file to .envrc
+# 2. Replace "your-claude-api-key-here" with your actual Claude API key
+# 3. Run: direnv allow (if using direnv)
+# 4. Or source .envrc manually before starting the application
+
+# Note: Make sure .envrc is added to .gitignore to keep your API key secure

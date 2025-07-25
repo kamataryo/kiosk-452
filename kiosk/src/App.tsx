@@ -43,16 +43,18 @@ function App() {
   // WebSocket接続とVOICEVOX音声システム
   const {
     connected,
-    systemStatus,
-    isProcessing,
+    // systemStatus,
+    // isProcessing,
     isMandanProcessing,
     currentMandan,
     ollamaStatus,
-    synthesizeVoice,
+    claudeStatus,
+    // synthesizeVoice,
     // getSpeakers,
     generateMandan,
     getOllamaStatus,
-    speakWithBrowserTTS
+    getClaudeStatus,
+    // speakWithBrowserTTS
   } = useWebSocket();
 
   console.log(zundamonParams, currentTime, gpsData, weatherData, voiceStatus)
@@ -157,26 +159,26 @@ function App() {
   }, []);
 
   // VOICEVOX音声テスト
-  const handleVoiceTest = () => {
-    const testMessages = [
-      'こんにちは！Smart Roadsterのキオスクシステムなのだ！',
-      'ずんだもんが音声でお知らせするのだ！',
-      'VOICEVOX音声合成システムが動作中なのだ！',
-      'WebSocketで音声データを送信しているのだ！'
-    ];
+  // const handleVoiceTest = () => {
+  //   const testMessages = [
+  //     'こんにちは！Smart Roadsterのキオスクシステムなのだ！',
+  //     'ずんだもんが音声でお知らせするのだ！',
+  //     'VOICEVOX音声合成システムが動作中なのだ！',
+  //     'WebSocketで音声データを送信しているのだ！'
+  //   ];
 
-    const randomMessage = testMessages[Math.floor(Math.random() * testMessages.length)];
-    synthesizeVoice(randomMessage, 3); // 3 = ずんだもん
-  };
+  //   const randomMessage = testMessages[Math.floor(Math.random() * testMessages.length)];
+  //   synthesizeVoice(randomMessage, 3); // 3 = ずんだもん
+  // };
 
   // ブラウザTTSテスト
-  const handleBrowserTTSTest = () => {
-    const testMessage = 'ブラウザの音声合成機能でテストしています。';
-    speakWithBrowserTTS(testMessage);
-  };
+  // const handleBrowserTTSTest = () => {
+  //   const testMessage = 'ブラウザの音声合成機能でテストしています。';
+  //   speakWithBrowserTTS(testMessage);
+  // };
 
-  // 漫談生成テスト
-  const handleMandanTest = () => {
+  // 漫談生成テスト（Ollama）
+  const handleMandanTestOllama = () => {
     const topics = [
       '料理に関する小話',
       '最近の天気について',
@@ -188,9 +190,27 @@ function App() {
     const randomTopic = topics[Math.floor(Math.random() * topics.length)];
     generateMandan({
       topic: randomTopic,
-      maxlength: 500,
+      maxlength: 100,
       speaker: 3,
-      model: 'mistral'
+      model: 'mistral',
+      provider: 'ollama'
+    });
+  };
+
+  // 漫談生成テスト（Claude）
+  const handleMandanTestClaude = () => {
+    const topics = [
+      '料理に関する小話',
+      '最近の天気',
+      '美味しい食べ物の話'
+    ];
+
+    const randomTopic = topics[Math.floor(Math.random() * topics.length)];
+    generateMandan({
+      topic: randomTopic,
+      maxlength: 100,
+      speaker: 3,
+      provider: 'claude'
     });
   };
 
@@ -198,8 +218,9 @@ function App() {
   useEffect(() => {
     if (connected) {
       getOllamaStatus();
+      getClaudeStatus();
     }
-  }, [connected, getOllamaStatus]);
+  }, [connected, getOllamaStatus, getClaudeStatus]);
 
   if (loading) {
     return (
@@ -258,7 +279,7 @@ function App() {
             */}
 
             {/* 音声システム */}
-            <div className="status-card voice-card">
+            {/* <div className="status-card voice-card">
               <h2>🗣️ ずんだもん音声システム</h2>
               <div>
                 <p><strong>WebSocket接続:</strong> {connected ? '✅ 接続中' : '❌ 切断'}</p>
@@ -285,15 +306,15 @@ function App() {
                     ブラウザTTSテスト
                   </button>
 
-                  {/* <button
+                  <button
                     onClick={getSpeakers}
                     className="voice-test-btn speakers-btn"
                   >
                     話者一覧取得
-                  </button> */}
+                  </button>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* システム情報 */}
             {/*
@@ -314,6 +335,10 @@ function App() {
                 {ollamaStatus?.models && ollamaStatus.models.length > 0 && (
                   <p><strong>利用可能モデル:</strong> {ollamaStatus.models.join(', ')}</p>
                 )}
+                <p><strong>Claude API:</strong> {claudeStatus?.available ? '✅ 利用可能' : '❌ 利用不可'}</p>
+                {claudeStatus && !claudeStatus.api_key_configured && (
+                  <p><strong>Claude APIキー:</strong> ❌ 未設定</p>
+                )}
                 <p><strong>漫談生成状態:</strong> {isMandanProcessing ? '🔄 生成中' : '⏸️ 待機中'}</p>
 
                 {currentMandan && (
@@ -329,11 +354,19 @@ function App() {
 
                 <div className="mandan-controls">
                   <button
-                    onClick={handleMandanTest}
-                    className="mandan-test-btn"
+                    onClick={handleMandanTestOllama}
+                    className="mandan-test-btn ollama-btn"
                     disabled={isMandanProcessing || !ollamaStatus?.available}
                   >
-                    {isMandanProcessing ? '漫談生成中...' : 'ずんだもん漫談生成'}
+                    {isMandanProcessing ? '漫談生成中...' : 'ずんだもん漫談生成（Ollama）'}
+                  </button>
+
+                  <button
+                    onClick={handleMandanTestClaude}
+                    className="mandan-test-btn claude-btn"
+                    disabled={isMandanProcessing || !claudeStatus?.available}
+                  >
+                    {isMandanProcessing ? '漫談生成中...' : 'ずんだもん漫談生成（Claude）'}
                   </button>
                 </div>
               </div>

@@ -36,6 +36,7 @@ services:
       - FLASK_DEBUG=1
       - VOICEVOX_URL=http://voicevox-engine:50021
       - OLLAMA_URL=http://ollama:11434
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
     restart: unless-stopped
     networks:
       - kiosk-network

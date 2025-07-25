@@ -21,6 +21,9 @@ requests==2.31.0
 # Ollama client for LLM integration
 ollama==0.1.7
 
+# Claude API client for LLM integration
+anthropic==0.34.2
+
 # YAML processing for structured output
 PyYAML==6.0.1
 

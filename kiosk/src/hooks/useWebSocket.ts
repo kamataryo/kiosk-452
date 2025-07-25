@@ -79,6 +79,7 @@ interface MandanRequest {
   maxlength: number;
   speaker?: number;
   model?: string;
+  provider?: 'ollama' | 'claude';
 }
 
 interface MandanResponse {
@@ -112,6 +113,14 @@ interface OllamaStatusData {
   timestamp: string;
 }
 
+interface ClaudeStatusData {
+  available: boolean;
+  api_key_configured: boolean;
+  model: string;
+  error?: string;
+  timestamp: string;
+}
+
 export const useWebSocket = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
@@ -121,6 +130,7 @@ export const useWebSocket = () => {
   const [isMandanProcessing, setIsMandanProcessing] = useState(false);
   const [currentMandan, setCurrentMandan] = useState<MandanResponse | null>(null);
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatusData | null>(null);
+  const [claudeStatus, setClaudeStatus] = useState<ClaudeStatusData | null>(null);
 
   // Base64をBlobに変換するヘルパー関数
   const base64ToBlob = useCallback((base64: string, mimeType: string): Blob => {
@@ -283,6 +293,12 @@ export const useWebSocket = () => {
       console.log('Ollama状態受信:', data);
     });
 
+    // Claude状態更新
+    newSocket.on('claude_status', (data: ClaudeStatusData) => {
+      setClaudeStatus(data);
+      console.log('Claude状態受信:', data);
+    });
+
     setSocket(newSocket);
 
     // クリーンアップ
@@ -334,6 +350,13 @@ export const useWebSocket = () => {
     }
   }, [socket, connected]);
 
+  // Claude状態取得
+  const getClaudeStatus = useCallback(() => {
+    if (socket && connected) {
+      socket.emit('get_claude_status');
+    }
+  }, [socket, connected]);
+
   return {
     socket,
     connected,
@@ -343,11 +366,13 @@ export const useWebSocket = () => {
     isMandanProcessing,
     currentMandan,
     ollamaStatus,
+    claudeStatus,
     synthesizeVoice,
     getSpeakers,
     getVoiceStatus,
     generateMandan,
     getOllamaStatus,
+    getClaudeStatus,
     speakWithBrowserTTS
   };
 };
