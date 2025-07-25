@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useZundamonExpression } from '../hooks/useZundamonExpression';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 interface SystemAlert {
   level: 'danger' | 'warning' | 'normal';
@@ -18,22 +19,17 @@ export const ZundamonDisplay: React.FC<ZundamonDisplayProps> = ({
   systemAlerts = [],
   className = ''
 }) => {
-  const { zundamonUrl, rpmRange } = useZundamonExpression(rpm);
+  const { synthesizeVoice } = useWebSocket();
 
-  const getRPMStatusText = () => {
-    switch (rpmRange) {
-      case 'idle':
-        return 'アイドリング中なのだ';
-      case 'normal':
-        return '通常走行中なのだ';
-      case 'active':
-        return '活発に走ってるのだ！';
-      case 'high':
-        return '高回転で興奮してるのだ！！';
-      default:
-        return '';
+  // メッセージが変更されたときの音声再生コールバック
+  const handleMessageChange = useCallback((message: string) => {
+    if (message && message.trim()) {
+      // cache: use オプションを使用してキャッシュ機能を活用
+      synthesizeVoice(message, 3, 'use'); // speaker 3 = ずんだもん, cache = use
     }
-  };
+  }, [synthesizeVoice]);
+
+  const { zundamonUrl, rpmRange, message } = useZundamonExpression(rpm, systemAlerts, handleMessageChange);
 
   const getRPMStatusClass = () => {
     switch (rpmRange) {
@@ -61,14 +57,6 @@ export const ZundamonDisplay: React.FC<ZundamonDisplayProps> = ({
     if (warningAlerts.length > 0) return warningAlerts[0];
 
     return systemAlerts[0];
-  };
-
-  const getDisplayMessage = () => {
-    const alert = getHighestPriorityAlert();
-    if (alert) {
-      return alert.message;
-    }
-    return getRPMStatusText();
   };
 
   const getDisplayClass = () => {
@@ -104,7 +92,7 @@ export const ZundamonDisplay: React.FC<ZundamonDisplayProps> = ({
 
       <div className={`rpm-status ${getDisplayClass()}`}>
         <div className="rpm-bubble">
-          <p>{getDisplayMessage()}</p>
+          <p>{message}</p>
           <div className="rpm-value">
             {rpm.toLocaleString()} RPM
           </div>

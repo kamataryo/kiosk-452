@@ -308,12 +308,13 @@ export const useWebSocket = () => {
   }, [base64ToBlob, speakWithBrowserTTS]);
 
   // 音声合成リクエスト
-  const synthesizeVoice = useCallback((text: string, speaker: number = 3) => {
+  const synthesizeVoice = useCallback((text: string, speaker: number = 3, cache: string = 'use') => {
     if (socket && connected && text.trim()) {
       socket.emit('voice_synthesize', {
         text: text.trim(),
         speaker,
-        priority: 'normal'
+        priority: 'normal',
+        cache: cache
       });
     } else {
       console.warn('WebSocket未接続または空のテキスト');

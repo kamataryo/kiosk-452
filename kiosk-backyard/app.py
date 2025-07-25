@@ -24,6 +24,8 @@ from concurrent.futures import ThreadPoolExecutor
 import ollama
 import anthropic
 from zundamon_compositor import ZundamonCompositor
+import hashlib
+from pathlib import Path
 
 # 既存モジュールのパスを追加
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -49,6 +51,10 @@ class VoicevoxClient:
 
     def __init__(self, base_url=None):
         self.base_url = base_url or os.getenv('VOICEVOX_URL', 'http://voicevox-engine:50021')
+        # キャッシュ設定
+        self.cache_dir = Path("/app/cache/voice/")
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.max_cache_size = 512 * 1024 * 1024  # 512MB
 
     def is_available(self):
         """VOICEVOX ENGINEが利用可能かチェック"""
@@ -67,6 +73,53 @@ class VoicevoxClient:
         except Exception as e:
             print(f"話者一覧取得エラー: {e}")
             return []
+
+    def _generate_cache_key(self, text, speaker_id):
+        """キャッシュキーを生成"""
+        key_string = f"{text}_{speaker_id}"
+        return hashlib.md5(key_string.encode('utf-8')).hexdigest()
+
+    def _get_cache_size(self):
+        """現在のキャッシュサイズを取得"""
+        total_size = 0
+        try:
+            for cache_file in self.cache_dir.glob("*.wav"):
+                total_size += cache_file.stat().st_size
+        except Exception as e:
+            print(f"キャッシュサイズ取得エラー: {e}")
+        return total_size
+
+    def _cleanup_cache(self):
+        """キャッシュサイズが上限を超えた場合、古いファイルを削除"""
+        try:
+            current_size = self._get_cache_size()
+            if current_size <= self.max_cache_size:
+                return
+
+            # ファイルを最終アクセス時刻でソート（古い順）
+            cache_files = []
+            for cache_file in self.cache_dir.glob("*.wav"):
+                try:
+                    stat = cache_file.stat()
+                    cache_files.append((cache_file, stat.st_atime, stat.st_size))
+                except Exception:
+                    continue
+
+            cache_files.sort(key=lambda x: x[1])  # アクセス時刻でソート
+
+            # 上限以下になるまで古いファイルを削除
+            for cache_file, _, file_size in cache_files:
+                if current_size <= self.max_cache_size:
+                    break
+                try:
+                    cache_file.unlink()
+                    current_size -= file_size
+                    print(f"キャッシュファイル削除: {cache_file.name}")
+                except Exception as e:
+                    print(f"キャッシュファイル削除エラー: {e}")
+
+        except Exception as e:
+            print(f"キャッシュクリーンアップエラー: {e}")
 
     def synthesize(self, text, speaker_id=3):
         """音声合成を実行"""
@@ -92,6 +145,52 @@ class VoicevoxClient:
 
         except Exception as e:
             print(f"音声合成エラー: {e}")
+            raise
+
+    def synthesize_with_cache(self, text, speaker_id=3, cache_mode='use'):
+        """キャッシュ機能付き音声合成"""
+        try:
+            cache_key = self._generate_cache_key(text, speaker_id)
+            cache_file = self.cache_dir / f"{cache_key}.wav"
+
+            # bypassモード: キャッシュを使わず、保存もしない
+            if cache_mode == 'bypass':
+                print(f"[キャッシュ] bypass モード: {text[:30]}...")
+                return self.synthesize(text, speaker_id)
+
+            # invalidateモード: キャッシュファイルを削除
+            if cache_mode == 'invalidate':
+                if cache_file.exists():
+                    cache_file.unlink()
+                    print(f"[キャッシュ] invalidate: {cache_file.name}")
+
+            # useモード: キャッシュがあれば使用
+            if cache_mode in ['use', 'invalidate'] and cache_file.exists():
+                print(f"[キャッシュ] ヒット: {cache_file.name}")
+                # ファイルのアクセス時刻を更新（LRU用）
+                cache_file.touch()
+                return cache_file.read_bytes()
+
+            # キャッシュがない場合は音声合成を実行
+            print(f"[キャッシュ] ミス: {text[:30]}...")
+            audio_data = self.synthesize(text, speaker_id)
+
+            # bypassモード以外はキャッシュに保存
+            if cache_mode != 'bypass':
+                try:
+                    # キャッシュサイズをチェックしてクリーンアップ
+                    self._cleanup_cache()
+
+                    # キャッシュファイルに保存
+                    cache_file.write_bytes(audio_data)
+                    print(f"[キャッシュ] 保存: {cache_file.name}")
+                except Exception as e:
+                    print(f"[キャッシュ] 保存エラー: {e}")
+
+            return audio_data
+
+        except Exception as e:
+            print(f"キャッシュ付き音声合成エラー: {e}")
             raise
 
 # VOICEVOX クライアントを初期化
@@ -265,11 +364,13 @@ def process_voice_queue():
         }, room=task['client_id'])
 
         try:
-            # VOICEVOX で音声合成
+            # VOICEVOX で音声合成（キャッシュ機能付き）
             if voicevox_client.is_available():
-                audio_data = voicevox_client.synthesize(
+                cache_mode = task.get('cache_mode', 'use')
+                audio_data = voicevox_client.synthesize_with_cache(
                     task['text'],
-                    task['speaker_id']
+                    task['speaker_id'],
+                    cache_mode
                 )
 
                 # 音声データをBase64エンコードして送信
@@ -329,6 +430,7 @@ def handle_voice_synthesize(data):
         text = data.get('text', '')
         speaker_id = data.get('speaker', 3)  # デフォルトはずんだもん
         priority = data.get('priority', 'normal')
+        cache_mode = data.get('cache', 'use')  # キャッシュ制御パラメータ
 
         if not text:
             emit('voice_error', {
@@ -345,6 +447,7 @@ def handle_voice_synthesize(data):
             'text': text,
             'speaker_id': speaker_id,
             'priority': priority,
+            'cache_mode': cache_mode,
             'client_id': request.sid,
             'timestamp': datetime.now().isoformat()
         })
@@ -467,7 +570,8 @@ def handle_generate_mandan(data):
             def generate_voice():
                 try:
                     if voicevox_client.is_available():
-                        return voicevox_client.synthesize(sentence, speaker_id)
+                        # 生成AIテキストはbypassモードで音声合成（キャッシュしない）
+                        return voicevox_client.synthesize_with_cache(sentence, speaker_id, 'bypass')
                     return None
                 except Exception as e:
                     print(f"音声生成エラー: {e}")
